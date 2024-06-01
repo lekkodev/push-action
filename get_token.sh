@@ -4,7 +4,7 @@ if [[ "$STAGING" == true ]]; then
 else
   HOST="https://prod.api.lekko.dev"
 fi
-echo "Fetching GitHub access token for ${OWNER_NAME}/${REPO_NAME} for Lekko team ${TEAM_NAME}"
+echo "Fetching GitHub access token for ${OWNER_NAME}/${REPO_NAME} for Lekko team ${TEAM_NAME}, hitting ${HOST}..."
 RESPONSE="$(buf curl ${HOST}/lekko.backend.v1beta1.GitHubService/GetInstallationAccessToken \
   -H "apikey: ${API_KEY}" \
   -d '{"team_name": "'"${TEAM_NAME}"'", "owner_name": "'"${OWNER_NAME}"'", "repo_name": "'"${REPO_NAME}"'"}')"
