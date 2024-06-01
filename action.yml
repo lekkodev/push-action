@@ -185,7 +185,7 @@ runs:
       if: github.event_name == 'pull_request' && steps.get_diff.outputs.diff_info != ''
       run: |
         cd ${GITHUB_WORKSPACE}
-        if [[ "$STAGING" == true ]]; then
+        if [[ "${{ inputs.staging }}" == true ]]; then
           HOST="https://app-staging.lekko.com"
         else
           HOST="https://app.lekko.com"
@@ -241,7 +241,7 @@ runs:
           echo "No Lekko diffs to apply"
           exit 0
         fi
-        if [[ "$STAGING" == true ]]; then
+        if [[ "${{ inputs.staging }}" == true ]]; then
           HOST="https://app-staging.lekko.com"
         else
           HOST="https://app.lekko.com"
@@ -389,7 +389,7 @@ runs:
       # See: https://github.com/cli/cli/issues/7401
       run: |
         cd ~/lekko
-        if [[ "$STAGING" == true ]]; then
+        if [[ "${{ inputs.staging }}" == true ]]; then
           HOST="https://app-staging.lekko.com"
         else
           HOST="https://app.lekko.com"
