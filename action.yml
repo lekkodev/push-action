@@ -185,7 +185,7 @@ runs:
     - name: Get diff
       id: get_diff
       shell: bash
-      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event.after }}
+      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     # TODO: If a PR goes from has Lekko changes -> no changes, we should try to delete or update the comment
