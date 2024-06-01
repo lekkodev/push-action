@@ -14,6 +14,9 @@ inputs:
     description: Whether to connect to Lekko's staging environment. For internal use only.
     required: false
     default: false
+  dev_api_key:
+    description: Alternative Lekko developer API key. For internal use only.
+    required: false
 runs:
   using: composite
   steps:
@@ -26,7 +29,7 @@ runs:
     - name: Set up Lekko
       uses: lekkodev/lekko-setup-action@v1
       with:
-        apikey: ${{ inputs.api_key }}
+        apikey: ${{ inputs.dev_api_key != '' && inputs.dev_api_key || inputs.api_key }}
         version: latest
     # TODO: Cache token (1 hour expiry)
     - name: Get access token
