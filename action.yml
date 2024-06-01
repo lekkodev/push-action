@@ -1,0 +1,424 @@
+name: "lekko-push"
+description: "Push changes to Lekko"
+branding:
+  icon: arrow-up-right
+  color: purple
+inputs:
+  api_key:
+    description: Lekko API key for the team/repository.
+    required: true
+  team_name:
+    description: Lekko team name. Uses the GitHub organization name by default. Only required if your Lekko team name is different from your GitHub organization name.
+    required: false
+  staging:
+    description: Whether to connect to Lekko's staging environment. For internal use only.
+    required: false
+    default: false
+runs:
+  using: composite
+  steps:
+    # This is what the user would have before the Lekko step
+    - uses: actions/checkout@v4
+    - name: Set up Buf
+      uses: bufbuild/buf-setup-action@v1.31.0
+      with:
+        github_token: ${{ github.token }}
+    - name: Set up Lekko
+      uses: lekkodev/lekko-setup-action@v1
+      with:
+        apikey: ${{ inputs.api_key }}
+        version: latest
+    # TODO: Cache token (1 hour expiry)
+    - name: Get access token
+      id: get_token
+      run: |
+        STAGING="${{ inputs.staging }}"
+        OWNER_NAME="${{ github.event.repository.owner.login }}"
+        REPO_NAME="${{ github.event.repository.name }}"
+        TEAM_NAME="${{ github.event.repository.owner.login }}"
+        if [[ -z "${{ inputs.team_name }}" ]]; then
+          TEAM_NAME="$OWNER_NAME"
+        fi
+        get_token.sh
+    # We re-checkout the code repo using the Lekko-issued token to do git operations on behalf of app
+    - name: Re-checkout with token
+      uses: actions/checkout@v4
+      with:
+        # There might be a more performant way to do this using plain git, but not sure how to do that easily while using the Lekko-issued token for auth
+        fetch-depth: 0
+        token: ${{ steps.get_token.outputs.token }}
+    # For a fix PR, we want to treat the generated commit (which pulls Lekko changes) as base
+    # Note that the associated fix branch may be deleted at this point, but that's fine
+    - name: Get push event base
+      id: get_push_base
+      if: github.event_name == 'push'
+      shell: bash {0}
+      run: |
+        PR_INFO="$(gh pr list --search "${{ github.event.head_commit.id }}" --state merged --json commits,headRefName,mergedBy,number,url --jq '.[0]')"
+        if [[ ! -z "$PR_INFO" ]]; then
+          echo "Pull request push info: $PR_INFO"
+          echo "pr_url="$(echo "$PR_INFO" | jq '.url' --raw-output)"" >> $GITHUB_OUTPUT
+          echo "pr_number="$(echo "$PR_INFO" | jq '.number' --raw-output)"" >> $GITHUB_OUTPUT
+          BRANCH="$(echo "$PR_INFO" | jq '.headRefName' --raw-output)"
+          echo "Pull request push branch: $BRANCH"
+          if [[ "$BRANCH" == lekko-fix-* || "$BRANCH" == lekko-to-code-* ]]; then
+            echo "This push event is associated with a Lekko fix PR"
+            BASE_SHA="$(echo "$PR_INFO" | jq '.commits[0].oid' --raw-output)"
+          else
+            echo "This pull request push is not associated with a Lekko fix PR"
+            BASE_SHA="${{ github.event.before }}"
+          fi
+          MERGED_BY_ID="$(echo "$PR_INFO" | jq '.mergedBy.id' --raw-output)"
+          if [[ "$MERGED_BY_ID" != "null" && "$MERGED_BY_ID" != "" ]]; then
+            MERGED_BY="$(gh api graphql \
+              -F id="$MERGED_BY_ID" \
+              -f query='
+                query userQuery($id: ID!) {
+                  node(id: $id) {
+                    ... on User {
+                      name
+                      login
+                      email
+                      databaseId
+                    }
+                  }
+                }
+                ' \
+              --jq '.data.node')"
+            echo "$MERGED_BY"
+            MERGED_BY_NAME="$(echo "$MERGED_BY" | jq '.name' --raw-output)"
+            MERGED_BY_USERNAME="$(echo "$MERGED_BY" | jq '.login' --raw-output)"
+            MERGED_BY_EMAIL="$(echo "$MERGED_BY" | jq '.email' --raw-output)"
+            if [[ -z "$MERGED_BY_EMAIL" ]]; then
+              MERGED_BY_EMAIL="$(echo "$MERGED_BY" | jq '.databaseId' --raw-output)+${MERGED_BY_USERNAME}@users.noreply.github.com"
+            fi
+            echo "Merged by: $MERGED_BY_NAME <${MERGED_BY_EMAIL}>"
+            echo "merged_by_name=$MERGED_BY_NAME" >> $GITHUB_OUTPUT
+            echo "merged_by_username=$MERGED_BY_USERNAME" >> $GITHUB_OUTPUT
+            echo "merged_by_email=$MERGED_BY_EMAIL" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "This push is not associated with a pull request"
+          BASE_SHA="${{ github.event.before }}"
+        fi
+        if [[ -z "$BASE_SHA" ]]; then
+          echo "Failed to determine base sha for changes"
+          exit 1
+        fi
+        echo "Base SHA: $BASE_SHA"
+        echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
+      env:
+        GH_TOKEN: ${{ steps.get_token.outputs.token }}
+    - name: Get pull request event base
+      id: get_pr_base
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Pull request branch: ${{ github.event.pull_request.head.ref }}"
+        if [[ "${{ github.event.pull_request.head.ref }}" == lekko-fix-* || "${{ github.event.pull_request.head.ref }}" == lekko-to-code-* ]]; then
+          echo "This pull request event is associated with a Lekko fix PR"
+          BASE_SHA="$(git rev-list ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | tail -1)"
+        else
+          echo "This pull request event is not associated with a Lekko fix PR"
+          BASE_SHA="$(git merge-base ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})"
+        fi
+        if [[ -z "$BASE_SHA" ]]; then
+          echo "Failed to determine base sha for changes"
+          exit 1
+        fi
+        echo "Base SHA: $BASE_SHA"
+        echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
+    - name: Consolidate base
+      id: get_base
+      # Only one of the 2 outputs should be a non-empty string
+      run: |
+        echo "base_sha=${{ steps.get_push_base.outputs.base_sha }}${{ steps.get_pr_base.outputs.base_sha }}" >> $GITHUB_OUTPUT
+        echo "merged_by_name=${{ steps.get_push_base.outputs.merged_by_name }}" >> $GITHUB_OUTPUT
+        echo "merged_by_username=${{ steps.get_push_base.outputs.merged_by_username }}" >> $GITHUB_OUTPUT
+        echo "merged_by_email=${{ steps.get_push_base.outputs.merged_by_email }}" >> $GITHUB_OUTPUT
+        echo "pr_url=${{ steps.get_push_base.outputs.pr_url }}" >> $GITHUB_OUTPUT
+        echo "pr_number=${{ steps.get_push_base.outputs.pr_number }}" >> $GITHUB_OUTPUT
+    - name: Read Lekko configuration
+      id: read_dot_lekko
+      run: read_dot_lekko.sh
+    - name: Checkout config repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ steps.read_dot_lekko.outputs.repository }}
+        path: _lekko
+        token: ${{ steps.get_token.outputs.token }}
+    # Move config repo to outside of code repo (which is at $GITHUB_WORKSPACE) so they it won't interfere with git ops
+    - name: Move config repo
+      run: mv ${GITHUB_WORKSPACE}/_lekko ~/lekko
+    # Check whether bisync was not run
+    # TODO: Figure out what makes sense in this case for push events
+    - name: Check bisync
+      if: github.event_name == 'pull_request'
+      shell: bash {0}
+      run: |
+        cd head
+        if ! lekko bisync -r ~/lekko; then
+          echo -e "Lekko codegen check failed.\n\nPlease run \`lekko bisync\`, fix the reported issues, and try again." > ~/info-body
+        else
+          if ! (git add . && git diff --quiet && git diff --cached --quiet); then
+            echo -e "Detected unchecked Lekko codegen changes.\n\nPlease run \`lekko bisync\` and commit the results." > ~/info-body
+          fi
+        fi
+        if [[ -s ~/info-body ]]; then
+          cat ~/info-body
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
+          exit 1
+        fi
+        git reset --hard && git clean -fd
+        cd ~/lekko
+        git reset --hard && git clean -fd
+      env:
+        GH_TOKEN: ${{ steps.get_token.outputs.token }}
+    # Get diff from perspective of config repo based on changes in code repo
+    - name: Get diff
+      id: get_diff
+      run: get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event.after }}
+      env:
+        GH_TOKEN: ${{ steps.get_token.outputs.token }}
+    # TODO: If a PR goes from has Lekko changes -> no changes, we should try to delete or update the comment
+    - name: Comment
+      id: comment
+      if: github.event_name == 'pull_request' && steps.get_diff.outputs.diff_info != ''
+      run: |
+        cd ${GITHUB_WORKSPACE}
+        if [[ "$STAGING" == true ]]; then
+          HOST="https://app-staging.lekko.com"
+        else
+          HOST="https://app.lekko.com"
+        fi
+        DIFF_INFO="${{ steps.get_diff.outputs.diff_info }}"
+        if [[ ! -z "$DIFF_INFO" ]]; then
+          echo "This pull request includes changes to the following Lekko configs:" >> ~/info-body
+          echo "" >> ~/info-body
+          echo "| Config | Status |" >> ~/info-body
+          echo "| :----- | :----- |" >> ~/info-body
+          while IFS= read -r LINE ; do
+            N_S=(${LINE//;/ })
+            case ${N_S[1]} in
+              D)
+                STATUS=":x: Deleted"
+                RENDER_LINK=true
+                ;;
+              M)
+                STATUS=":pencil2: Modified"
+                RENDER_LINK=true
+                ;;
+              A)
+                STATUS=":green_circle: Added"
+                RENDER_LINK=false
+                ;;
+            esac
+            if [[ $RENDER_LINK == true ]]; then
+              CONFIG_SUFFIX="$(echo "${N_S[0]}" | sed 's/\//\/configs\//g' | sed 's/^/namespaces\//g')"
+              echo "| [${N_S[0]}]($HOST/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }}/branches/main/${CONFIG_SUFFIX}) | $STATUS |" >> ~/info-body
+            else
+              echo "| ${N_S[0]} | $STATUS |" >> ~/info-body
+            fi
+          done <<< "$DIFF_INFO"
+          echo "" >> ~/info-body
+          echo "When this branch is merged, the changes will automatically be deployed to Lekko. You can verify your changes on your [Lekko dashboard](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/info-body
+        else
+          echo -e "This pull request does not include any changes to Lekko configs." > ~/info-body
+        fi
+        gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
+      env:
+        GH_TOKEN: ${{ steps.get_token.outputs.token }}
+    # Try to apply relevant changes from this push to LR and create a PR for them
+    # If creating the PR fails, we need to offer a fix
+    # TODO: Figure out how to assign to correct user even if the main author is bot
+    # TODO: Related to ^, figure out how to add user as coauthor of mirror commit so that webapp can display
+    - name: Open Lekko PR
+      id: create_pr
+      if: github.event_name == 'push' && steps.get_diff.outputs.diff_info != ''
+      # To not fail prematurely on intermediate errors
+      shell: bash {0}
+      run: |
+        if [[ -z $(cat ~/lekko.patch) ]]; then
+          echo "No Lekko diffs to apply"
+          exit 0
+        fi
+        if [[ "$STAGING" == true ]]; then
+          HOST="https://app-staging.lekko.com"
+        else
+          HOST="https://app.lekko.com"
+        fi
+        git config --global user.email "108442683+lekko-app[bot]@users.noreply.github.com"
+        git config --global user.name "lekko-app[bot]"
+        cd ~/lekko
+        git checkout main
+        BEFORE_SHORT="$(git rev-parse --short ${{ github.event.before }})"
+        AFTER_SHORT="$(git rev-parse --short ${{ github.event.after }})"
+        LEKKO_BRANCH=${GITHUB_REPOSITORY}-${BEFORE_SHORT}-${AFTER_SHORT}
+        BRANCH_LS=$(git ls-remote --heads origin refs/heads/${LEKKO_BRANCH})
+        if [[ ! -z ${BRANCH_LS} ]]; then
+          echo "Branch $LEKKO_BRANCH already exists"
+          exit 1
+        fi
+        git checkout -b $LEKKO_BRANCH
+        if ! git apply ~/lekko.patch; then
+          LEKKO_SHA="$(git rev-parse HEAD)"
+          echo "Failed to apply patch on ${LEKKO_SHA}"
+          echo "Automatic deployment of Lekko changes failed because this project and the config repository are out of sync. One or more remote config changes conflict with changes introduced in this repository between ${{ github.event.before }} and ${{ github.event.after }}."
+          echo "---------------------------------------------------------------------"
+          git checkout main
+          cd ${GITHUB_WORKSPACE}
+          git checkout ${{ steps.get_base.outputs.base_sha }}
+          FIX_BRANCH=lekko-fix-${BEFORE_SHORT}-${AFTER_SHORT}
+          BRANCH_LS=$(git ls-remote --heads origin refs/heads/${FIX_BRANCH})
+          if [[ ! -z ${BRANCH_LS} ]]; then
+            echo "Branch $FIX_BRANCH already exists"
+            exit 1
+          fi
+          echo "Collecting diff info..."
+          lekko bisync -r ~/lekko
+          git reset --hard && git clean -fd
+          cd ~/lekko
+          git add .
+          DIFF_INFO="$(git diff --cached --binary --name-status --no-renames | grep .star | sed -E 's/(^.+)\t(.*).star/\2;\1/g' | sort)"
+          git reset --hard && git clean -fd
+          cd ${GITHUB_WORKSPACE}
+          git checkout ${{ steps.get_base.outputs.base_sha }}
+          echo "Making fix branch"
+          git checkout -b $FIX_BRANCH
+          lekko gen -r ~/lekko
+          git add .
+          FIX_MESSAGE="Pull from ${{ steps.read_dot_lekko.outputs.repository }}@$(git rev-parse --short ${LEKKO_SHA})"
+          git commit -m "$FIX_MESSAGE"
+          git push -u origin $FIX_BRANCH
+          echo "This pull request brings in the latest changes from your [Lekko config repository](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/fix-body
+          echo "" >> ~/fix-body
+          echo "It was generated because [Run #${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) encountered a conflict while attempting to automatically deploy changes." >> ~/fix-body
+          echo "" >> ~/fix-body
+          echo "The local code for the following configs will be updated:" >> ~/fix-body
+          echo "" >> ~/fix-body
+          echo "| Config | Status |" >> ~/fix-body
+          echo "| :----- | :----- |" >> ~/fix-body
+          while IFS= read -r LINE ; do
+            N_S=(${LINE//;/ })
+            case ${N_S[1]} in
+              A)
+                STATUS=":x: Deleted"
+                RENDER_LINK=false
+                ;;
+              M)
+                STATUS=":pencil2: Modified"
+                RENDER_LINK=true
+                ;;
+              D)
+                STATUS=":green_circle: Added"
+                RENDER_LINK=true
+                ;;
+            esac
+            if [[ $RENDER_LINK == true ]]; then
+              CONFIG_SUFFIX="$(echo "${N_S[0]}" | sed 's/\//\/configs\//g' | sed 's/^/namespaces\//g')"
+              echo "| [${N_S[0]}]($HOST/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }}/branches/main/${CONFIG_SUFFIX}) | $STATUS |" >> ~/fix-body
+            else
+              echo "| ${N_S[0]} | $STATUS |" >> ~/fix-body
+            fi
+          done <<< "$DIFF_INFO"
+          echo "---" >> ~/fix-body
+          echo "To resolve the conflict:" >> ~/fix-body
+          echo "1. Check out this branch: \`git fetch origin && git checkout $FIX_BRANCH\`" >> ~/fix-body
+          echo "2. Run \`git pull --no-rebase origin ${{ github.event.repository.default_branch }}\`" >> ~/fix-body
+          echo "3. Handle the merge conflicts and push to this PR" >> ~/fix-body
+          echo "4. Merge this PR" >> ~/fix-body
+          echo "---" >> ~/fix-body
+          echo "Generated by Lekko CI. Please do not force push or change the base/head refs of this PR." >> ~/fix-body
+          PR_URL="$(gh pr create -B ${{ github.event.repository.default_branch }} -H $FIX_BRANCH --title "$FIX_MESSAGE" --body-file ~/fix-body --assignee "$([[ "${{ github.event.head_commit.author.username }}" != *\[bot\] ]] && echo "${{ github.event.head_commit.author.username }}" || echo "")")"
+          if [[ $? -ne 0 ]]; then
+            echo "Failed to create ${{ github.repository }} PR for branch $FIX_BRANCH"
+            exit 1
+          fi
+          echo "A pull request to pull the latest configs from Lekko was automatically created: ${PR_URL}"
+          echo "Please follow the instructions on the above pull request to resolve the conflict."
+          if [[ ! -z "${{ steps.get_base.outputs.pr_url }}" ]]; then
+            echo ":x: Failed to automatically deploy Lekko changes because this project and the target config repository are out of sync. A conflict was detected." >> ~/conflict-body
+            echo "" >> ~/conflict-body
+            echo "A pull request to pull the latest changes from Lekko was automatically created: ${PR_URL}" >> ~/conflict-body
+            echo "" >> ~/conflict-body
+            echo "Please follow the instructions on the above pull request to resolve the conflict." >> ~/conflict-body
+            gh pr comment "${{ steps.get_base.outputs.pr_url }}" --body-file ~/conflict-body
+          fi
+          exit 1
+        fi
+        echo "Successfully applied patch"
+        lekko compile
+        git add .
+        if [[ ! -z "${{ steps.get_base.outputs.pr_number}}" ]]; then
+          TITLE="Mirror ${GITHUB_REPOSITORY}#${{ steps.get_base.outputs.pr_number}}"
+        else
+          TITLE="Mirror ${GITHUB_REPOSITORY}@${BEFORE_SHORT}..${AFTER_SHORT}"
+        fi
+        COMMIT_MSG="$TITLE"
+        if [[ ! -z "${{ steps.get_base.outputs.merged_by_email }}" ]]; then
+          if [[ ! -z "${{ steps.get_base.outputs.merged_by_name }}" ]]; then
+            CO_AUTHOR_NAME="${{ steps.get_base.outputs.merged_by_name }}"
+          elif [[ ! -z "${{ steps.get_base.outputs.merged_by_username }}" ]]; then
+            CO_AUTHOR_NAME="${{ steps.get_base.outputs.merged_by_username }}"
+          else
+            CO_AUTHOR_NAME="${{ steps.get_base.outputs.merged_by_email }}"
+          fi
+          COMMIT_MSG="$COMMIT_MSG"$'\n\n'"Co-authored-by: $CO_AUTHOR_NAME <${{ steps.get_base.outputs.merged_by_email }}>"
+        fi
+        git commit --allow-empty -m "$COMMIT_MSG"
+        git push -u origin $LEKKO_BRANCH
+        echo "Successfully pushed branch $LEKKO_BRANCH"
+        echo "Generated by Lekko CI [$GITHUB_REPOSITORY Run #${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" > ~/mirror-body
+        if [[ ! -z "${{ steps.get_base.outputs.pr_url }}" ]]; then
+          echo "Generated by Lekko CI based on ${{ steps.get_base.outputs.pr_url }}" > ~/mirror-body
+        fi
+        PR_URL="$(gh pr create -B main -H $LEKKO_BRANCH --title "$TITLE" --body-file ~/mirror-body)"
+        if [[ $? -ne 0 ]]; then
+          echo "Failed to create ${{ steps.read_dot_lekko.outputs.repository }} PR for branch $LEKKO_BRANCH, please open and merge a PR manually"
+          exit 1
+        fi
+        echo "Successfully opened pull request to propagate changes: ${PR_URL}"
+        echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+      env:
+        GH_TOKEN: ${{ steps.get_token.outputs.token }}
+    # Automatically merge the generated PR against LR
+    - name: Merge Lekko PR
+      id: merge_pr
+      if: steps.create_pr.outputs.pr_url != ''
+      shell: bash {0}
+      # NOTE: There's a race condition - after a PR is created, `gh pr checks` might fail thinking that there are no checks on the PR
+      # See: https://github.com/cli/cli/issues/7401
+      run: |
+        cd ~/lekko
+        if [[ "$STAGING" == true ]]; then
+          HOST="https://app-staging.lekko.com"
+        else
+          HOST="https://app.lekko.com"
+        fi
+        while :
+        do
+          STATUS="$(gh pr view ${{ steps.create_pr.outputs.pr_url }} --json statusCheckRollup --jq '.statusCheckRollup[0].status')"
+          if [[ $? -ne 0 ]]; then
+            echo "Unexpected error while checking status of ${{ steps.create_pr.outputs.pr_url }}"
+            echo "Please make sure you have accepted the latest permissions for the Lekko GitHub App by going to https://github.com/organizations/${{ github.event.repository.owner.login }}/settings/installations and that the app has access to this repository"
+            echo "Trying merge anyway..."
+            break
+          fi
+          if [[ "$STATUS" == "COMPLETED" ]]; then
+            echo "Checks have been completed"
+            break
+          else
+            echo "Waiting for checks to complete..."
+            sleep 5
+          fi
+        done
+        if ! gh pr merge ${{ steps.create_pr.outputs.pr_url }} --auto --squash --delete-branch; then
+          echo "Failed to automatically merge ${{ steps.create_pr.outputs.pr_url }}"
+          exit 1
+        fi
+        echo "Successfully merged ${{ steps.create_pr.outputs.pr_url }}"
+        if [[ ! -z "${{ steps.get_base.outputs.pr_url }}" ]]; then
+          echo ":white_check_mark: Successfully pushed changes to Lekko! You can verify and continue making changes on your [Lekko dashboard](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/success-body
+          gh pr comment "${{ steps.get_base.outputs.pr_url }}" --body-file ~/success-body
+        fi
+      env:
+        GH_TOKEN: ${{ steps.get_token.outputs.token }}
