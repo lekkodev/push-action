@@ -43,7 +43,7 @@ runs:
         if [[ -z "${{ inputs.team_name }}" ]]; then
           TEAM_NAME="$OWNER_NAME"
         fi
-        ./get_token.sh
+        ${GITHUB_ACTION_PATH}/get_token.sh
     # We re-checkout the code repo using the Lekko-issued token to do git operations on behalf of app
     - name: Re-checkout with token
       uses: actions/checkout@v4
@@ -146,7 +146,7 @@ runs:
     - name: Read Lekko configuration
       id: read_dot_lekko
       shell: bash
-      run: read_dot_lekko.sh
+      run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh
     - name: Checkout config repo
       uses: actions/checkout@v4
       with:
@@ -185,7 +185,7 @@ runs:
     - name: Get diff
       id: get_diff
       shell: bash
-      run: get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event.after }}
+      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event.after }}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     # TODO: If a PR goes from has Lekko changes -> no changes, we should try to delete or update the comment
