@@ -31,6 +31,7 @@ runs:
     # TODO: Cache token (1 hour expiry)
     - name: Get access token
       id: get_token
+      shell: bash
       run: |
         STAGING="${{ inputs.staging }}"
         OWNER_NAME="${{ github.event.repository.owner.login }}"
@@ -112,6 +113,7 @@ runs:
     - name: Get pull request event base
       id: get_pr_base
       if: github.event_name == 'pull_request'
+      shell: bash
       run: |
         echo "Pull request branch: ${{ github.event.pull_request.head.ref }}"
         if [[ "${{ github.event.pull_request.head.ref }}" == lekko-fix-* || "${{ github.event.pull_request.head.ref }}" == lekko-to-code-* ]]; then
@@ -129,6 +131,7 @@ runs:
         echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
     - name: Consolidate base
       id: get_base
+      shell: bash
       # Only one of the 2 outputs should be a non-empty string
       run: |
         echo "base_sha=${{ steps.get_push_base.outputs.base_sha }}${{ steps.get_pr_base.outputs.base_sha }}" >> $GITHUB_OUTPUT
@@ -139,6 +142,7 @@ runs:
         echo "pr_number=${{ steps.get_push_base.outputs.pr_number }}" >> $GITHUB_OUTPUT
     - name: Read Lekko configuration
       id: read_dot_lekko
+      shell: bash
       run: read_dot_lekko.sh
     - name: Checkout config repo
       uses: actions/checkout@v4
@@ -148,6 +152,7 @@ runs:
         token: ${{ steps.get_token.outputs.token }}
     # Move config repo to outside of code repo (which is at $GITHUB_WORKSPACE) so they it won't interfere with git ops
     - name: Move config repo
+      shell: bash
       run: mv ${GITHUB_WORKSPACE}/_lekko ~/lekko
     # Check whether bisync was not run
     # TODO: Figure out what makes sense in this case for push events
@@ -176,6 +181,7 @@ runs:
     # Get diff from perspective of config repo based on changes in code repo
     - name: Get diff
       id: get_diff
+      shell: bash
       run: get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event.after }}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
@@ -183,6 +189,7 @@ runs:
     - name: Comment
       id: comment
       if: github.event_name == 'pull_request' && steps.get_diff.outputs.diff_info != ''
+      shell: bash
       run: |
         cd ${GITHUB_WORKSPACE}
         if [[ "${{ inputs.staging }}" == true ]]; then
