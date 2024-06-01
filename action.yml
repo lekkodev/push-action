@@ -43,7 +43,7 @@ runs:
         if [[ -z "${{ inputs.team_name }}" ]]; then
           TEAM_NAME="$OWNER_NAME"
         fi
-        get_token.sh
+        ./get_token.sh
     # We re-checkout the code repo using the Lekko-issued token to do git operations on behalf of app
     - name: Re-checkout with token
       uses: actions/checkout@v4
