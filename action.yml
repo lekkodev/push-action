@@ -39,7 +39,7 @@ runs:
         export STAGING="${{ inputs.staging }}"
         export OWNER_NAME="${{ github.event.repository.owner.login }}"
         export REPO_NAME="${{ github.event.repository.name }}"
-        export TEAM_NAME="${{ github.event.repository.owner.login }}"
+        export TEAM_NAME="${{ inputs.team_name }}"
         if [[ -z "${{ inputs.team_name }}" ]]; then
           export TEAM_NAME="$OWNER_NAME"
         fi
