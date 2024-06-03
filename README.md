@@ -7,7 +7,7 @@ This GitHub Action enables changes to Lekko functions in your projects to be pus
 Example `.github/workflows/ci.yaml` for a Node project:
 
 > [!IMPORTANT]
-> This Action should be configured to trigger on `pull_request` and `push` events on your repository's default branch, as shown below.
+> This Action should be configured to **only** trigger on `pull_request` and `push` events on your repository's default branch, as shown below.
 
 ```yaml
 name: ci
@@ -24,6 +24,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # It is required to checkout and install dependencies for your project before the Lekko push step
       - name: Checkout project
         uses: actions/checkout@v4
       - name: Set up language-specific environment
@@ -50,10 +51,10 @@ jobs:
 
 Example:
 
-```
+```yaml
 version: v1
-repository: your-org/lekko-repository
-lekko_path: src/lekko
+repository: your-org/lekko-repository # Your Lekko repository
+lekko_path: src/lekko # Path to Lekko function files in project
 ```
 
 ### Inputs
@@ -65,4 +66,4 @@ lekko_path: src/lekko
 | api_key   | Your Lekko API key for the team/repository.                                                   | Y        |
 | team_name | Your Lekko team name. Only required if your team name is different from your GitHub org name. | N        |
 
-For the `api_key` input, it's recommended to store it as an organization or repository secret, as shown in the above example.
+For the `api_key` input, it's recommended to store and read the value as an organization or repository [secret](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/managing-development-environment-secrets-for-your-repository-or-organization), as shown in the above example.
