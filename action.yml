@@ -147,6 +147,7 @@ runs:
       run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh
     - name: Set Lekko checkout path
       id: set_lekko_checkout_path
+      shell: bash
       run: |
         cd ~
         echo "path="$(echo pwd)"" >> $GITHUB_OUTPUT
