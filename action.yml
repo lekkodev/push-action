@@ -160,6 +160,8 @@ runs:
       if: github.event_name == 'pull_request'
       shell: bash {0}
       run: |
+        cd ${GITHUB_WORKSPACE}
+        echo "$(pwd)"
         if ! lekko bisync -r ~/lekko; then
           echo -e "Lekko codegen check failed.\n\nPlease run \`lekko bisync\`, fix the reported issues, and try again." > ~/info-body
         else
