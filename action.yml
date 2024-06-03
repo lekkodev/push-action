@@ -40,9 +40,14 @@ runs:
         export REPO_NAME="${{ github.event.repository.name }}"
         export TEAM_NAME="${{ inputs.team_name != '' && inputs.team_name || github.event.repository.owner.login }}"
         ${GITHUB_ACTION_PATH}/get_token.sh
-    - name: Fetch origin
-      shell: bash
-      run: git fetch origin
+    # We re-checkout the code repo using the Lekko-issued token for git remove permissions available to the app (e.g. write)
+    - name: Re-checkout with token
+      uses: actions/checkout@v4
+      with:
+        # We need to fetch all commits, otherwise we run into "corrupted" git errors when trying to check out specific commits
+        fetch-depth: 0
+        clean: false
+        token: ${{ steps.get_token.outputs.token }}
     # For a fix PR, we want to treat the generated commit (which pulls Lekko changes) as base
     # Note that the associated fix branch may be deleted at this point, but that's fine
     - name: Get push event base
@@ -291,7 +296,7 @@ runs:
           git reset --hard && git clean -fd
           cd ${GITHUB_WORKSPACE}
           git checkout ${{ steps.get_base.outputs.base_sha }}
-          echo "Making fix branch"
+          echo "Checking out new fix branch $FIX_BRANCH"
           git checkout -b $FIX_BRANCH
           lekko gen -r ~/lekko
           git add .
