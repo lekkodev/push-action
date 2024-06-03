@@ -150,7 +150,7 @@ runs:
       shell: bash
       run: |
         cd ~
-        echo "path="$(echo pwd)"" >> $GITHUB_OUTPUT
+        echo "path="$(pwd)"" >> $GITHUB_OUTPUT
     - name: Checkout config repo
       uses: actions/checkout@v4
       with:
