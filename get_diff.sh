@@ -1,6 +1,7 @@
 #!/bin/bash -e
 git config --global user.email "108442683+lekko-app[bot]@users.noreply.github.com"
 git config --global user.name "lekko-app[bot]"
+git fsck --full
 git checkout $1
 echo "pre-sync base"
 lekko bisync -r ~/lekko
