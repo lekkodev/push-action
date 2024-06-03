@@ -162,6 +162,7 @@ runs:
       run: |
         cd ${GITHUB_WORKSPACE}
         echo "$(pwd)"
+        npx why lekko-repo-sync
         if ! lekko bisync -r ~/lekko; then
           echo -e "Lekko codegen check failed.\n\nPlease run \`lekko bisync\`, fix the reported issues, and try again." > ~/info-body
         else
