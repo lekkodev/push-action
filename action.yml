@@ -110,9 +110,6 @@ runs:
         echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
         echo "Fetch base"
         git fetch origin $BASE_SHA
-        git checkout $BASE_SHA
-        echo "Confirmed base health"
-        git checkout HEAD
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     - name: Get pull request event base
@@ -149,14 +146,14 @@ runs:
       id: read_dot_lekko
       shell: bash
       run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh
-    - name: Checkout config repo
+    - name: Checkout Lekko repo
       uses: actions/checkout@v4
       with:
         repository: ${{ steps.read_dot_lekko.outputs.repository }}
         path: _lekko
         token: ${{ steps.get_token.outputs.token }}
-    # Move config repo to outside of code repo (which is at $GITHUB_WORKSPACE) so they it won't interfere with git ops
-    - name: Move config repo
+    # Move Lekko repo to outside of code repo (which is at $GITHUB_WORKSPACE) so they it won't interfere with git ops
+    - name: Move Lekko repo
       shell: bash
       run: mv ${GITHUB_WORKSPACE}/_lekko ~/lekko
     # Check whether bisync was not run
@@ -185,7 +182,7 @@ runs:
         git reset --hard && git clean -fd
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
-    # Get diff from perspective of config repo based on changes in code repo
+    # Get diff from perspective of Lekko repo based on changes in code repo
     - name: Get diff
       id: get_diff
       shell: bash
@@ -207,10 +204,10 @@ runs:
         fi
         DIFF_INFO="${{ steps.get_diff.outputs.diff_info }}"
         if [[ ! -z "$DIFF_INFO" ]]; then
-          echo "This pull request includes changes to the following Lekko configs:" >> ~/info-body
+          echo "This pull request includes changes to the following lekkos:" >> ~/info-body
           echo "" >> ~/info-body
-          echo "| Config | Status |" >> ~/info-body
-          echo "| :----- | :----- |" >> ~/info-body
+          echo "| Lekko | Status |" >> ~/info-body
+          echo "| :-----| :----- |" >> ~/info-body
           while IFS= read -r LINE ; do
             N_S=(${LINE//;/ })
             case ${N_S[1]} in
@@ -237,7 +234,7 @@ runs:
           echo "" >> ~/info-body
           echo "When this branch is merged, the changes will automatically be deployed to Lekko. You can verify your changes on your [Lekko dashboard](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/info-body
         else
-          echo -e "This pull request does not include any changes to Lekko configs." > ~/info-body
+          echo -e "This pull request does not include any changes to your lekkos." > ~/info-body
         fi
         gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
       env:
@@ -278,7 +275,7 @@ runs:
         if ! git apply ~/lekko.patch; then
           LEKKO_SHA="$(git rev-parse HEAD)"
           echo "Failed to apply patch on ${LEKKO_SHA}"
-          echo "Automatic deployment of Lekko changes failed because this project and the config repository are out of sync. One or more remote config changes conflict with changes introduced in this repository between ${{ github.event.before }} and ${{ github.event.after }}."
+          echo "Automatic push of Lekko changes failed because this project and the live mirror are out of sync. One or more remote changes conflict with changes introduced in this repository between ${{ github.event.before }} and ${{ github.event.after }}."
           echo "---------------------------------------------------------------------"
           git checkout main
           cd ${GITHUB_WORKSPACE}
@@ -305,14 +302,14 @@ runs:
           FIX_MESSAGE="Pull from ${{ steps.read_dot_lekko.outputs.repository }}@$(git rev-parse --short ${LEKKO_SHA})"
           git commit -m "$FIX_MESSAGE"
           git push -u origin $FIX_BRANCH
-          echo "This pull request brings in the latest changes from your [Lekko config repository](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/fix-body
+          echo "This pull request brings in the latest values of your [lekkos](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/fix-body
           echo "" >> ~/fix-body
-          echo "It was generated because [Run #${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) encountered a conflict while attempting to automatically deploy changes." >> ~/fix-body
+          echo "It was generated because [Run #${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) encountered a conflict while attempting to automatically push changes." >> ~/fix-body
           echo "" >> ~/fix-body
-          echo "The local code for the following configs will be updated:" >> ~/fix-body
+          echo "The local code for the following lekkos will be updated:" >> ~/fix-body
           echo "" >> ~/fix-body
-          echo "| Config | Status |" >> ~/fix-body
-          echo "| :----- | :----- |" >> ~/fix-body
+          echo "| Lekko | Status |" >> ~/fix-body
+          echo "| :---- | :----- |" >> ~/fix-body
           while IFS= read -r LINE ; do
             N_S=(${LINE//;/ })
             case ${N_S[1]} in
@@ -340,21 +337,21 @@ runs:
           echo "To resolve the conflict:" >> ~/fix-body
           echo "1. Check out this branch: \`git fetch origin && git checkout $FIX_BRANCH\`" >> ~/fix-body
           echo "2. Run \`git pull --no-rebase origin ${{ github.event.repository.default_branch }}\`" >> ~/fix-body
-          echo "3. Handle the merge conflicts and push to this PR" >> ~/fix-body
+          echo "3. Handle the merge conflicts, make any additional changes, and then push to this PR" >> ~/fix-body
           echo "4. Merge this PR" >> ~/fix-body
           echo "---" >> ~/fix-body
-          echo "Generated by Lekko CI. Please do not force push or change the base/head refs of this PR." >> ~/fix-body
+          echo "Generated by Lekko :sparkles: Please do not force push or change the base/head branches of this PR." >> ~/fix-body
           PR_URL="$(gh pr create -B ${{ github.event.repository.default_branch }} -H $FIX_BRANCH --title "$FIX_MESSAGE" --body-file ~/fix-body --assignee "$([[ "${{ github.event.head_commit.author.username }}" != *\[bot\] ]] && echo "${{ github.event.head_commit.author.username }}" || echo "")")"
           if [[ $? -ne 0 ]]; then
             echo "Failed to create ${{ github.repository }} PR for branch $FIX_BRANCH"
             exit 1
           fi
-          echo "A pull request to pull the latest configs from Lekko was automatically created: ${PR_URL}"
+          echo "A pull request to pull the latest values of lekkos was automatically created: ${PR_URL}"
           echo "Please follow the instructions on the above pull request to resolve the conflict."
           if [[ ! -z "${{ steps.get_base.outputs.pr_url }}" ]]; then
-            echo ":x: Failed to automatically deploy Lekko changes because this project and the target config repository are out of sync. A conflict was detected." >> ~/conflict-body
+            echo ":x: Failed to automatically push Lekko changes because this project and the live mirror are out of sync. A conflict was detected." >> ~/conflict-body
             echo "" >> ~/conflict-body
-            echo "A pull request to pull the latest changes from Lekko was automatically created: ${PR_URL}" >> ~/conflict-body
+            echo "A pull request to pull the latest values of lekkos was automatically created: ${PR_URL}" >> ~/conflict-body
             echo "" >> ~/conflict-body
             echo "Please follow the instructions on the above pull request to resolve the conflict." >> ~/conflict-body
             gh pr comment "${{ steps.get_base.outputs.pr_url }}" --body-file ~/conflict-body
