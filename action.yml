@@ -20,8 +20,6 @@ inputs:
 runs:
   using: composite
   steps:
-    # This is what the user would have before the Lekko step
-    - uses: actions/checkout@v4
     - name: Set up Buf
       uses: bufbuild/buf-setup-action@v1.31.0
       with:
