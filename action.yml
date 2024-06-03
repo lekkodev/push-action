@@ -108,7 +108,8 @@ runs:
         fi
         echo "Base SHA: $BASE_SHA"
         echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
-        git cat-file -p $BASE_SHA
+        echo "Fetch base"
+        git fetch origin $BASE_SHA
         git checkout $BASE_SHA
         echo "Confirmed base health"
         git checkout HEAD
