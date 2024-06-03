@@ -162,6 +162,7 @@ runs:
       run: |
         cd ${GITHUB_WORKSPACE}
         echo "$(pwd)"
+        echo "$(ls -al)"
         echo "$(npx which lekko-repo-sync)"
         npx lekko-repo-sync
         if ! lekko bisync -r ~/lekko; then
