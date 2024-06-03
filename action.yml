@@ -42,13 +42,9 @@ runs:
         export REPO_NAME="${{ github.event.repository.name }}"
         export TEAM_NAME="${{ inputs.team_name != '' && inputs.team_name || github.event.repository.owner.login }}"
         ${GITHUB_ACTION_PATH}/get_token.sh
-    # We re-checkout the code repo using the Lekko-issued token to do git operations on behalf of app
-    - name: Re-checkout with token
-      uses: actions/checkout@v4
-      with:
-        # There might be a more performant way to do this using plain git, but not sure how to do that easily while using the Lekko-issued token for auth
-        fetch-depth: 0
-        token: ${{ steps.get_token.outputs.token }}
+    - name: Fetch origin
+      shell: bash
+      run: git fetch origin
     # For a fix PR, we want to treat the generated commit (which pulls Lekko changes) as base
     # Note that the associated fix branch may be deleted at this point, but that's fine
     - name: Get push event base
@@ -111,7 +107,7 @@ runs:
         echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
         git checkout $BASE_SHA
         echo "Confirmed base health"
-        git checkout ${{ github.event.after }}
+        git checkout HEAD
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     - name: Get pull request event base
