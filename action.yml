@@ -162,6 +162,7 @@ runs:
           echo -e "Lekko codegen check failed.\n\nPlease run \`lekko bisync\`, fix the reported issues, and try again." > ~/info-body
         else
           if ! (git add . && git diff --quiet && git diff --cached --quiet); then
+            echo "$(git diff --cached)"
             echo -e "Detected unchecked Lekko codegen changes.\n\nPlease run \`lekko bisync\` and commit the results." > ~/info-body
           fi
         fi
