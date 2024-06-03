@@ -109,6 +109,9 @@ runs:
         fi
         echo "Base SHA: $BASE_SHA"
         echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
+        git checkout $BASE_SHA
+        echo "Confirmed base health"
+        git checkout ${{ github.event.after }}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     - name: Get pull request event base
