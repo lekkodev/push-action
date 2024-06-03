@@ -145,16 +145,17 @@ runs:
       id: read_dot_lekko
       shell: bash
       run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh
+    - name: Set Lekko checkout path
+      id: set_lekko_checkout_path
+      run: |
+        cd ~
+        echo "path="$(echo pwd)"" >> $GITHUB_OUTPUT
     - name: Checkout config repo
       uses: actions/checkout@v4
       with:
         repository: ${{ steps.read_dot_lekko.outputs.repository }}
-        path: _lekko
+        path: ${{ steps.set_lekko_checkout_path.outputs.path }}/lekko
         token: ${{ steps.get_token.outputs.token }}
-    # Move config repo to outside of code repo (which is at $GITHUB_WORKSPACE) so they it won't interfere with git ops
-    - name: Move config repo
-      shell: bash
-      run: mv ${GITHUB_WORKSPACE}/_lekko ~/lekko
     # Check whether bisync was not run
     # TODO: Figure out what makes sense in this case for push events
     - name: Check bisync

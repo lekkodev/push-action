@@ -3,7 +3,6 @@ git config --global user.email "108442683+lekko-app[bot]@users.noreply.github.co
 git config --global user.name "lekko-app[bot]"
 echo "pre-sync health check"
 git reset --hard && git clean -fd
-git gc
 echo "$(git fsck --full)"
 git checkout $1
 echo "pre-sync base"
