@@ -1,6 +1,8 @@
 # Lekko Push Action
 
-This GitHub Action enables changes to Lekko functions in your projects to be pushed to Lekko automatically.
+This GitHub Action enables changes to Lekko functions in your projects to be pushed to Lekko automatically. It also lets you know if there are any relevant changes in your pull requests that will be pushed via the Lekko GitHub App.
+
+![example comment](./public/comment.png)
 
 ## Usage
 
@@ -8,13 +10,17 @@ Example `.github/workflows/ci.yaml` for a Node project:
 
 > [!IMPORTANT]
 > This Action should be configured to **only** trigger on `pull_request` and `push` events on your repository's default branch, as shown below.
+>
+> To learn more about GitHub events, please refer to their [docs](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows).
 
 ```yaml
 name: ci
 on:
+  # Run this workflow when pull requests are opened or updated against main
   pull_request:
     branches:
       - main
+  # Run this workflow when a commit is pushed to main (e.g. a pull request is merged)
   push:
     branches:
       - main
@@ -67,3 +73,11 @@ lekko_path: src/lekko # Path to Lekko function files in project
 | team_name | Your Lekko team name. Only required if your team name is different from your GitHub org name. | N        |
 
 For the `api_key` input, it's recommended to store and read the value as an organization or repository [secret](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/managing-development-environment-secrets-for-your-repository-or-organization), as shown in the above example.
+
+## Conflict resolution
+
+If someone makes changes to lekkos from outside your code (e.g. through the Lekko dashboard), it's possible that an attempted code change will result in a conflict at the destination when it's merged.
+
+If there are any conflicts when pushing your changes, this Action will automatically open a pull request to help you resolve them.
+
+![example conflict](./public/conflict.png)
