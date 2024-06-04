@@ -276,6 +276,7 @@ runs:
           LEKKO_SHA="$(git rev-parse HEAD)"
           echo "Failed to apply patch on ${LEKKO_SHA}"
           echo "Automatic push of Lekko changes failed because this project and the live mirror are out of sync. One or more remote changes conflict with changes introduced in this repository between ${{ github.event.before }} and ${{ github.event.after }}."
+          echo "Generating fix PR:"
           echo "---------------------------------------------------------------------"
           git checkout main
           cd ${GITHUB_WORKSPACE}
