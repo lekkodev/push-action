@@ -108,8 +108,12 @@ runs:
         fi
         echo "Base SHA: $BASE_SHA"
         echo "base_sha=$BASE_SHA" >> $GITHUB_OUTPUT
-        echo "Fetch base"
-        git fetch origin $BASE_SHA
+        if [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+          echo "Base SHA is null commit"
+        else
+          echo "Fetch base"
+          git fetch origin $BASE_SHA
+        fi
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     - name: Get pull request event base
