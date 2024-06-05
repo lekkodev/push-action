@@ -1,16 +1,20 @@
 #!/bin/bash -e
 git config --global user.email "108442683+lekko-app[bot]@users.noreply.github.com"
 git config --global user.name "lekko-app[bot]"
-git reset --hard && git clean -fd
-git checkout $1
-echo "pre-sync base"
-set +e
-if ! lekko bisync -r ~/lekko; then
-  # If bisync fails on base commit, ignore and try to proceed
-  # This might result in detecting "unnecessary" additions, but hopefully fix PR should help resolve that
-  echo "Warning: bisync failed on base ($1). The current state of your Lekko repository will be used as the base of changes."
+if [[ "$1" != "0000000000000000000000000000000000000000" ]]; then
+  git reset --hard && git clean -fd
+  git checkout $1
+  echo "pre-sync base"
+  set +e
+  if ! lekko bisync -r ~/lekko; then
+    # If bisync fails on base commit, ignore and try to proceed
+    # This might result in detecting "unnecessary" additions, but hopefully fix PR should help resolve that
+    echo "Warning: bisync failed on base ($1). The current state of your Lekko repository will be used as the base of changes."
+  fi
+  set -e
+else
+  echo "Base points to null commit"
 fi
-set -e
 git reset --hard && git clean -fd
 cd ~/lekko
 git checkout -b ${GITHUB_REPOSITORY}-base
