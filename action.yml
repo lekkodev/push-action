@@ -167,7 +167,7 @@ runs:
         if ! lekko bisync -r ~/lekko; then
           echo -e "Lekko codegen check failed.\n\nPlease run \`lekko bisync\`, fix the reported issues, and try again." > ~/info-body
         else
-          if ! (git add . && git diff --quiet && git diff --cached --quiet); then
+          if ! (git add ${{ steps.read_dot_lekko.outputs.lekko_path }} && git diff --quiet && git diff --cached --quiet); then
             echo "$(git diff --cached)"
             echo -e "Detected unchecked Lekko codegen changes.\n\nPlease run \`lekko bisync\` and commit the results." > ~/info-body
           fi
@@ -299,7 +299,7 @@ runs:
           echo "Checking out new fix branch $FIX_BRANCH"
           git checkout -b $FIX_BRANCH
           lekko gen -r ~/lekko
-          git add .
+          git add ${{ steps.read_dot_lekko.outputs.lekko_path }}
           FIX_MESSAGE="Pull from ${{ steps.read_dot_lekko.outputs.repository }}@$(git rev-parse --short ${LEKKO_SHA})"
           git commit -m "$FIX_MESSAGE"
           git push -u origin $FIX_BRANCH
