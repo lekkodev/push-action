@@ -44,7 +44,7 @@ jobs:
           npm run build
           npm run test
       # This is where Lekko comes in
-      - uses: lekkodev/push-action@v1.0.2
+      - uses: lekkodev/push-action@v1
         with:
           api_key: ${{ secrets.LEKKO_API_KEY }}
 ```
