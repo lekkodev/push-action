@@ -8,11 +8,9 @@ if [[ "$1" != "0000000000000000000000000000000000000000" ]]; then
     # lekko conf failed - assume this means .lekko did not exist at base
     echo "Current change introduced Lekko"
     echo "new_lekko=true" >> $GITHUB_OUTPUT
-    exit
   fi
 else
   echo "Base points to null commit"
   echo "new_lekko=true" >> $GITHUB_OUTPUT
-  exit
 fi
-echo "new_lekko=false" >> $GITHUB_OUTPUT
+git checkout $2
