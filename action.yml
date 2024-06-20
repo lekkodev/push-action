@@ -218,6 +218,7 @@ runs:
         DIFF_INFO="${{ steps.get_diff.outputs.diff_info }}"
         if [[ ! -z "$DIFF_INFO" ]]; then
           if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" == true ]]; then
+            echo "" >> ~/info-body
             echo "---" >> ~/info-body
           fi
           echo "This pull request includes changes to the following lekkos:" >> ~/info-body
