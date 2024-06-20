@@ -160,14 +160,15 @@ runs:
         repository: ${{ steps.read_dot_lekko.outputs.repository }}
         path: _lekko
         token: ${{ steps.get_token.outputs.token }}
-    # Move Lekko repo to outside of code repo (which is at $GITHUB_WORKSPACE) so they it won't interfere with git ops
+    # Move Lekko repo to outside of code repo (which is at $GITHUB_WORKSPACE) so that it won't interfere with git ops
     - name: Move Lekko repo
       shell: bash
       run: mv ${GITHUB_WORKSPACE}/_lekko ~/lekko
     # Check whether bisync was not run
-    # TODO: Figure out what makes sense in this case for push events
+    # If there are no changes in Lekko repo after running bisync from head, treat as special case - don't try to mirror anything
+    # This is to handle cases such as if user manually ran pull
     - name: Check bisync
-      if: github.event_name == 'pull_request'
+      id: check_bisync
       shell: bash {0}
       run: |
         echo "pre-check reset"
@@ -180,19 +181,25 @@ runs:
             echo -e "Detected unchecked Lekko codegen changes.\n\nPlease run \`lekko bisync\` and commit the results." > ~/info-body
           fi
         fi
-        if [[ -s ~/info-body ]]; then
+        if [[ -s ~/info-body ]] && [[ "${{ github.event_name }}" == "pull_request" ]]; then
           cat ~/info-body
           gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
           exit 1
         fi
         git reset --hard && git clean -fd
         cd ~/lekko
+        if git add . && git diff --quiet && git diff --cached --quiet; then
+          echo "head is equal to lekko head, diff checking will be skipped"
+          echo "head_equal=true" >> $GITHUB_OUTPUT
+        fi
         git reset --hard && git clean -fd
+        cd ${GITHUB_WORKSPACE}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     # Get diff from perspective of Lekko repo based on changes in code repo
     - name: Get diff
       id: get_diff
+      if: steps.check_bisync.outputs.head_equal != 'true'
       shell: bash
       run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }} ${{ steps.read_dot_lekko_base.outputs.new_lekko }}
       env:
