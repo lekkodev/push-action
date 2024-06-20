@@ -248,7 +248,9 @@ runs:
           echo "" >> ~/info-body
           echo "When this branch is merged, the changes will automatically be deployed to Lekko. You can verify your changes on your [Lekko dashboard](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/info-body
         else
-          echo -e "This pull request does not include any changes to your lekkos." > ~/info-body
+          if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" != true ]]; then
+            echo -e "This pull request does not include any changes to your lekkos." >> ~/info-body
+          fi
         fi
         gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
       env:
