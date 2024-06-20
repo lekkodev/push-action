@@ -150,6 +150,10 @@ runs:
       id: read_dot_lekko
       shell: bash
       run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh
+    - name: Read Lekko configuration at base
+      id: read_dot_lekko_base
+      shell: bash
+      run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh ${{ steps.get_base.outputs.base_sha }}
     - name: Checkout Lekko repo
       uses: actions/checkout@v4
       with:
@@ -190,7 +194,7 @@ runs:
     - name: Get diff
       id: get_diff
       shell: bash
-      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }}
+      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }} ${{ steps.read_dot_lekko_base.outputs.new_lekko }}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     # TODO: If a PR goes from has Lekko changes -> no changes, we should try to delete or update the comment
