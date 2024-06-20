@@ -181,7 +181,7 @@ runs:
             echo -e "Detected unchecked Lekko codegen changes.\n\nPlease run \`lekko bisync\` and commit the results." > ~/info-body
           fi
         fi
-        if [[ -s ~/info-body -a "${{ github.event_name }}" == "pull_request" ]]; then
+        if [[ -s ~/info-body ]] || [[ "${{ github.event_name }}" == "pull_request" ]]; then
           cat ~/info-body
           gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
           exit 1
