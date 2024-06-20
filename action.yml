@@ -200,7 +200,7 @@ runs:
     # TODO: If a PR goes from has Lekko changes -> no changes, we should try to delete or update the comment
     - name: Comment
       id: comment
-      if: github.event_name == 'pull_request' && steps.get_diff.outputs.diff_info != ''
+      if: github.event_name == 'pull_request' && (steps.get_diff.outputs.diff_info != '' || steps.read_dot_lekko_base.outputs.new_lekko == 'true')
       shell: bash
       run: |
         export TEAM_NAME="${{ inputs.team_name != '' && inputs.team_name || github.event.repository.owner.login }}"
@@ -210,8 +210,14 @@ runs:
         else
           HOST="https://app.lekko.com"
         fi
+        if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" == true ]]; then
+          echo "Congratulations, your project is now connected to Lekko! :tada:" >> ~/info-body
+        fi
         DIFF_INFO="${{ steps.get_diff.outputs.diff_info }}"
         if [[ ! -z "$DIFF_INFO" ]]; then
+          if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" == true ]]; then
+            echo "" >> ~/info-body
+          fi
           echo "This pull request includes changes to the following lekkos:" >> ~/info-body
           echo "" >> ~/info-body
           echo "| Lekko | Status |" >> ~/info-body
