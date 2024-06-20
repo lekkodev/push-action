@@ -153,7 +153,7 @@ runs:
     - name: Read Lekko configuration at base
       id: read_dot_lekko_base
       shell: bash
-      run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh ${{ steps.get_base.outputs.base_sha }}
+      run: ${GITHUB_ACTION_PATH}/read_dot_lekko_base.sh ${{ steps.get_base.outputs.base_sha }}
     - name: Checkout Lekko repo
       uses: actions/checkout@v4
       with:
