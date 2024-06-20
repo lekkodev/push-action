@@ -167,10 +167,8 @@ runs:
     # Check whether bisync was not run
     # If there are no changes in Lekko repo after running bisync from head, treat as special case - don't try to mirror anything
     # This is to handle cases such as if user manually ran pull
-    # TODO: Figure out what makes sense in this case for push events
     - name: Check bisync
       id: check_bisync
-      if: github.event_name == 'pull_request'
       shell: bash {0}
       run: |
         echo "pre-check reset"
@@ -183,7 +181,7 @@ runs:
             echo -e "Detected unchecked Lekko codegen changes.\n\nPlease run \`lekko bisync\` and commit the results." > ~/info-body
           fi
         fi
-        if [[ -s ~/info-body ]]; then
+        if [[ -s ~/info-body -a ${{ github.event_name }} == "pull_request" ]]; then
           cat ~/info-body
           gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
           exit 1
