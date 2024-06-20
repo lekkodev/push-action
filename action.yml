@@ -212,8 +212,8 @@ runs:
         fi
         if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" == true ]]; then
           echo "Congratulations, your project is now connected to Lekko! :tada:" >> ~/info-body
-          echo ""
-          echo "Try logging into the [web UI](https://app.lekko.com/), exploring our [docs](https://docs.lekko.com/), or making more lekko changes!"
+          echo "" >> ~/info-body
+          echo "Try logging into the [web UI](https://app.lekko.com/), exploring our [docs](https://docs.lekko.com/), or making more lekko changes!" >> ~/info-body
         fi
         DIFF_INFO="${{ steps.get_diff.outputs.diff_info }}"
         if [[ ! -z "$DIFF_INFO" ]]; then
