@@ -150,6 +150,10 @@ runs:
       id: read_dot_lekko
       shell: bash
       run: ${GITHUB_ACTION_PATH}/read_dot_lekko.sh
+    - name: Read Lekko configuration at base
+      id: read_dot_lekko_base
+      shell: bash
+      run: ${GITHUB_ACTION_PATH}/read_dot_lekko_base.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }}
     - name: Checkout Lekko repo
       uses: actions/checkout@v4
       with:
@@ -190,13 +194,13 @@ runs:
     - name: Get diff
       id: get_diff
       shell: bash
-      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }}
+      run: ${GITHUB_ACTION_PATH}/get_diff.sh ${{ steps.get_base.outputs.base_sha }} ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }} ${{ steps.read_dot_lekko_base.outputs.new_lekko }}
       env:
         GH_TOKEN: ${{ steps.get_token.outputs.token }}
     # TODO: If a PR goes from has Lekko changes -> no changes, we should try to delete or update the comment
     - name: Comment
       id: comment
-      if: github.event_name == 'pull_request' && steps.get_diff.outputs.diff_info != ''
+      if: github.event_name == 'pull_request' && (steps.get_diff.outputs.diff_info != '' || steps.read_dot_lekko_base.outputs.new_lekko == 'true')
       shell: bash
       run: |
         export TEAM_NAME="${{ inputs.team_name != '' && inputs.team_name || github.event.repository.owner.login }}"
@@ -206,8 +210,17 @@ runs:
         else
           HOST="https://app.lekko.com"
         fi
+        if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" == true ]]; then
+          echo "Congratulations, your project is now connected to Lekko! :tada:" >> ~/info-body
+          echo "" >> ~/info-body
+          echo "Try logging into the [web UI](https://app.lekko.com/), exploring our [docs](https://docs.lekko.com/), or making more lekko changes!" >> ~/info-body
+        fi
         DIFF_INFO="${{ steps.get_diff.outputs.diff_info }}"
         if [[ ! -z "$DIFF_INFO" ]]; then
+          if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" == true ]]; then
+            echo "" >> ~/info-body
+            echo "---" >> ~/info-body
+          fi
           echo "This pull request includes changes to the following lekkos:" >> ~/info-body
           echo "" >> ~/info-body
           echo "| Lekko | Status |" >> ~/info-body
@@ -238,7 +251,9 @@ runs:
           echo "" >> ~/info-body
           echo "When this branch is merged, the changes will automatically be deployed to Lekko. You can verify your changes on your [Lekko dashboard](${HOST}/teams/${TEAM_NAME}/repositories/${{ steps.read_dot_lekko.outputs.repository }})." >> ~/info-body
         else
-          echo -e "This pull request does not include any changes to your lekkos." > ~/info-body
+          if [[ "${{ steps.read_dot_lekko_base.outputs.new_lekko }}" != true ]]; then
+            echo -e "This pull request does not include any changes to your lekkos." >> ~/info-body
+          fi
         fi
         gh pr comment ${{ github.event.pull_request.number }} --edit-last --body-file ~/info-body || gh pr comment ${{ github.event.pull_request.number }} --body-file ~/info-body
       env:
