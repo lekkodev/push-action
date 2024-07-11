@@ -318,7 +318,7 @@ runs:
           git reset --hard && git clean -fd
           cd ~/lekko
           git add .
-          DIFF_INFO="$(git diff --cached --binary --name-status --no-renames | grep .star | sed -E 's/(^.+)\t(.*).star/\2;\1/g' | sort)"
+          DIFF_INFO="$(git diff --cached --binary --name-status --no-renames | grep '\.star' | sed -E 's/(^.+)\t(.*).star/\2;\1/g' | sort)"
           git reset --hard && git clean -fd
           cd ${GITHUB_WORKSPACE}
           git checkout ${{ steps.get_base.outputs.base_sha }}
@@ -387,6 +387,10 @@ runs:
         fi
         echo "Successfully applied patch"
         lekko compile
+        if [[ $? -ne 0 ]]; then
+          echo "Failed to compile in Lekko repository"
+          exit 1
+        fi
         git add .
         if [[ ! -z "${{ steps.get_base.outputs.pr_number}}" ]]; then
           TITLE="Mirror ${GITHUB_REPOSITORY}#${{ steps.get_base.outputs.pr_number}}"

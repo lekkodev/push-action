@@ -46,7 +46,7 @@ cat ~/lekko.patch
 echo "-----------------------------"
 if [[ -s ${HOME}/lekko.patch ]]; then
   # Each line is e.g. default/example;M based on status
-  DIFF_INFO="$(git diff --binary --name-status --no-renames HEAD~1 HEAD | grep .star | sed -E 's/(^.+)\t(.*).star/\2;\1/g' | sort)"
+  DIFF_INFO="$(git diff --binary --name-status --no-renames HEAD~1 HEAD | grep '\.star' | sed -E 's/(^.+)\t(.*).star/\2;\1/g' | sort)"
   echo "diff_info<<\n" >> $GITHUB_OUTPUT
   echo -e "$DIFF_INFO" >> $GITHUB_OUTPUT
   echo "\n" >> $GITHUB_OUTPUT
