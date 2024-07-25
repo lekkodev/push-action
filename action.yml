@@ -338,8 +338,10 @@ runs:
           git checkout ${{ steps.get_base.outputs.base_sha }}
           echo "Checking out new fix branch $FIX_BRANCH"
           git checkout -b $FIX_BRANCH
+          cd ${{ inputs.project_path }}
           lekko gen -r ~/lekko
           git add ${{ steps.read_dot_lekko.outputs.lekko_path }}
+          cd ${GITHUB_WORKSPACE}
           FIX_MESSAGE="Pull from ${{ steps.read_dot_lekko.outputs.repository }}@$(git rev-parse --short ${LEKKO_SHA})"
           git commit -m "$FIX_MESSAGE"
           git push -u origin $FIX_BRANCH
