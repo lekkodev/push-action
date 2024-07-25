@@ -14,11 +14,13 @@ if [[ "$1" != "0000000000000000000000000000000000000000" ]]; then
     git checkout $1
     echo "pre-sync base"
     set +e
+    cd ${PROJECT_PATH}
     if ! lekko bisync -r ~/lekko; then
       # If bisync fails on base commit, ignore and try to proceed
       # This might result in detecting "unnecessary" additions, but hopefully fix PR should help resolve that
       echo "Warning: bisync failed on base ($1). The current state of your Lekko repository will be used as the base of changes."
     fi
+    cd ${GITHUB_WORKSPACE}
     set -e
   else
     echo "Base did not have Lekko"
@@ -34,7 +36,9 @@ git commit --allow-empty -m "Reset configs to base"
 cd ${GITHUB_WORKSPACE}
 git checkout $2
 echo "pre-sync head"
+cd ${PROJECT_PATH}
 lekko bisync -r ~/lekko
+cd ${GITHUB_WORKSPACE}
 git reset --hard && git clean -fd
 cd ~/lekko
 git checkout -b ${GITHUB_REPOSITORY}-head
