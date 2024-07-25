@@ -11,7 +11,7 @@ Example `.github/workflows/ci.yaml` for a Node project:
 > [!IMPORTANT]
 > This Action should be configured to **only** trigger on `pull_request` and `push` events on your repository's default branch, as shown below.
 >
-> To learn more about GitHub events, please refer to their [docs](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows).
+> To learn more about GitHub events, please refer to GitHub's [docs](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows).
 
 ```yaml
 name: ci
@@ -59,18 +59,22 @@ Example:
 
 ```yaml
 version: v1
-repository: your-org/lekko-repository # Your Lekko repository
+repository: your-org/lekko-configs # Your Lekko repository
 lekko_path: src/lekko # Path to Lekko function files in project
 ```
+
+> [!NOTE]
+> If you have multiple projects in your repository as a monorepo setup, you should use the `project_path` input outlined below.
 
 ### Inputs
 
 `lekkodev/push-action` takes the following inputs:
 
-| Input     | Description                                                                                   | Required |
-| --------- | --------------------------------------------------------------------------------------------- | -------- |
-| api_key   | Your Lekko API key for the team/repository.                                                   | Y        |
-| team_name | Your Lekko team name. Only required if your team name is different from your GitHub org name. | N        |
+| Input        | Description                                                                                                                     | Required |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| api_key      | Your Lekko API key for the team/repository.                                                                                     | Y        |
+| team_name    | Your Lekko team name. Only required if your team name is different from your GitHub org name.                                   | N        |
+| project_path | Path to a sub-project using Lekko (i.e. path to `.lekko`). This input is relevant if you have a monorepo setup. `.` by default. | N        |
 
 For the `api_key` input, it's recommended to store and read the value as an organization or repository [secret](https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/managing-development-environment-secrets-for-your-repository-or-organization), as shown in the above example.
 
